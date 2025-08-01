@@ -1,0 +1,12 @@
+[package]
+name = "pt_dict_bot"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+reqwest = { version = "0.12", features = ["rustls-tls"] } # or async
+scraper = "0.23.1"
+tokio = { version = "1", features = ["full"] }            # if using async
+teloxide = { version = "0.17.0", features = ["macros"] }
+log = "0.4"
+pretty_env_logger = "0.5"

@@ -1,10 +1,13 @@
+use dotenv::dotenv;
 use teloxide::{prelude::*, types::ParseMode};
+
 mod fetch_translations;
 
 #[tokio::main]
 async fn main() {
+    dotenv().ok();
     pretty_env_logger::init();
-    log::info!("Starting Carlos Portugues bot...");
+    log::info!("Starting Portuguese dict bot...");
 
     let bot = Bot::from_env();
 

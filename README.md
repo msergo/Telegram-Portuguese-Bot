@@ -12,3 +12,4 @@ A minimal Telegram bot that fetches Portuguese-English translations from [wordre
 - [ ] Store already fetched articles
 - [ ] Setup webhook
 - [ ] Support reverse translation
+- [ ] Add tests

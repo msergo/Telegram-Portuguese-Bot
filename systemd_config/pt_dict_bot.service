@@ -1,0 +1,14 @@
+[Unit]
+Description=Portugal Dict Bot Service
+After=network.target
+
+[Service]
+ExecStart=/opt/pt_dict_bot/pt_dict_bot
+WorkingDirectory=/opt/pt_dict_bot
+Restart=always
+RestartSec=5
+Environment=RUST_LOG=info
+EnvironmentFile=/opt/pt_dict_bot/.env
+
+[Install]
+WantedBy=multi-user.target

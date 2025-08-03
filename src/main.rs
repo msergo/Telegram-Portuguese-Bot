@@ -12,8 +12,8 @@ async fn main() {
     let bot = Bot::from_env();
 
     let addr = ([127, 0, 0, 1], 3030).into();
-    let webhook_url = std::env::var("WEBHOOK_URL").expect("WEBHOOK_URL must be set");
-    let url = reqwest::Url::parse(&webhook_url).expect("Invalid WEBHOOK_URL");
+    let webhook_address = std::env::var("WEBHOOK_ADDRESS").expect("WEBHOOK_ADDRESS must be set");
+    let url = reqwest::Url::parse(&webhook_address).expect("Invalid WEBHOOK_ADDRESS");
 
     let listener = webhooks::axum(bot.clone(), webhooks::Options::new(addr, url))
         .await

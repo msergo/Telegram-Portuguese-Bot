@@ -54,7 +54,7 @@ pub async fn fetch(word: &str) -> String {
 
             // TODO: improve formatting
             translations.push_str(&format!(
-                "*{}* {} => {}\n",
+                "<b>{}</b> {} => {}\n",
                 get_from_word_text(&tds[0]),
                 tds[1].text().collect::<Vec<_>>().join(" "),
                 get_translation_text(&tds[2])

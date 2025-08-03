@@ -69,8 +69,16 @@ async fn main() {
                 /*
                 Store the fetched HTML in the database
                 */
-                let _ = db::insert_html(&pool, &word, "pten", &body).await;
+
                 let translations = fetch_translations::parse_body(&body).await;
+                if translations.is_empty() {
+                    bot.send_message(msg.chat.id, "No translations found.")
+                        .parse_mode(ParseMode::Html)
+                        .await?;
+                    return Ok(());
+                }
+
+                let _ = db::insert_html(&pool, &word, "pten", &body).await;
                 let _ = db::update_formatted(&pool, &word, "pten", &translations).await;
 
                 bot.send_message(msg.chat.id, translations)

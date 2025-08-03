@@ -35,7 +35,7 @@ async fn main() {
             let pool = pool.clone(); // clone the pool for this handler
 
             async move {
-                let word = msg.text().unwrap_or("").trim().to_string();
+                let word = msg.text().unwrap_or("").trim().to_string().to_lowercase();
 
                 // Check if cached in DB
                 if let Some(cached) = db::get_cached_formatted(&pool, &word, "pten")

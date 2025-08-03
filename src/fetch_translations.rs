@@ -18,6 +18,13 @@ pub async fn fetch(word: &str) -> String {
         .await
         .unwrap();
 
+    return body;
+    // let translations = parse_body(&body).await;
+
+    // return translations;
+}
+
+pub async fn parse_body(body: &str) -> String {
     let doc = Html::parse_document(&body);
     let table_sel = Selector::parse("table.WRD").unwrap();
     let row_sel = Selector::parse("tr").unwrap();

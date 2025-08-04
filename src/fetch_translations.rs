@@ -59,8 +59,8 @@ pub fn get_translations(table_html: &str) -> String {
     translations
 }
 
-pub async fn fetch(word: &str) -> String {
-    let url = format!("https://www.wordreference.com/pten/{}", word);
+pub async fn fetch(word: &str, lang_direction: &str) -> String {
+    let url = format!("https://www.wordreference.com/{}/{}", lang_direction, word);
     let client = Client::new();
 
     let body = client

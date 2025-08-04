@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use dotenv::dotenv;
 use sqlx::SqlitePool;
 use teloxide::{
@@ -39,6 +41,8 @@ async fn main() {
             let pool = pool.clone(); // clone the pool for this handler
 
             async move {
+                // Log chat ID and message ID for debugging
+                log::info!("Received message in chat {}", msg.chat.id);
                 let word = msg.text().unwrap_or("").trim().to_string().to_lowercase();
                 // If word is empty, do nothing
                 if word.is_empty() {
@@ -62,10 +66,20 @@ async fn main() {
                     word
                 };
 
+                // Quick and dirty solution: get trnslation direction from env CHAT_TRANSLATION_DIRECTION_{CHAT_ID}, fallback to "pten" if not set
+                // TODO get dir from user settings
+                let chat_id = Arc::new(msg.chat.id.to_string().replace("-", ""));
+                let chat_translation_direction_key = format!("DIRECTION_{}", chat_id);
+
+                // Get the direction from env, or default to "pten"
+                let chat_translation_direction = dotenv::var(&chat_translation_direction_key)
+                    .unwrap_or_else(|_| "pten".to_string());
+
                 // Check if cached in DB
-                if let Some(cached) = db::get_cached_formatted(&pool, &word, "pten")
-                    .await
-                    .unwrap()
+                if let Some(cached) =
+                    db::get_cached_formatted(&pool, &word, &chat_translation_direction)
+                        .await
+                        .unwrap()
                 {
                     bot.send_message(msg.chat.id, cached)
                         .parse_mode(ParseMode::Html)
@@ -75,11 +89,20 @@ async fn main() {
 
                 // TODO: Refactor this huge if statement
                 // check if cached raw HTML exists without formatted translation (for cases when it was removed when formatting has changed)
-                if let Some(cached_html) = db::get_cached_html(&pool, &word, "pten").await.unwrap()
+                if let Some(cached_html) =
+                    db::get_cached_html(&pool, &word, &chat_translation_direction)
+                        .await
+                        .unwrap()
                 {
                     let translations = fetch_translations::get_translations(&cached_html);
                     // Store the formatted translation in the database
-                    let _ = db::update_formatted(&pool, &word, "pten", &translations).await;
+                    let _ = db::update_formatted(
+                        &pool,
+                        &word,
+                        &chat_translation_direction,
+                        &translations,
+                    )
+                    .await;
                     bot.send_message(msg.chat.id, translations)
                         .parse_mode(ParseMode::Html)
                         .await?;
@@ -87,10 +110,10 @@ async fn main() {
                 }
 
                 // Not cached, fetch
-                let body = fetch_translations::fetch(&word).await;
+                let body = fetch_translations::fetch(&word, &chat_translation_direction).await;
 
-                // TODO get dir from user settings
-                let raw_translations = fetch_translations::get_raw_translations(&body, "pten");
+                let raw_translations =
+                    fetch_translations::get_raw_translations(&body, &chat_translation_direction);
 
                 if raw_translations.is_empty() {
                     bot.send_message(msg.chat.id, "No translations found.")
@@ -112,8 +135,13 @@ async fn main() {
                     return Ok(());
                 }
 
-                let _ = db::insert_html(&pool, &word, "pten", &raw_translations).await;
-                let _ = db::update_formatted(&pool, &word, "pten", &translations).await;
+                // TODO: store in one go
+                let _ =
+                    db::insert_html(&pool, &word, &chat_translation_direction, &raw_translations)
+                        .await;
+                let _ =
+                    db::update_formatted(&pool, &word, &chat_translation_direction, &translations)
+                        .await;
 
                 bot.send_message(msg.chat.id, translations)
                     .parse_mode(ParseMode::Html)

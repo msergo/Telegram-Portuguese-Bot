@@ -54,7 +54,7 @@ async fn main() {
                 // check if cached raw HTML exists without formatted translation (for cases when it was removed when formatting has changed)
                 if let Some(cached_html) = db::get_cached_html(&pool, &word, "pten").await.unwrap()
                 {
-                    let translations = fetch_translations::parse_body(&cached_html).await;
+                    let translations = fetch_translations::get_translations(&cached_html);
                     // Store the formatted translation in the database
                     let _ = db::update_formatted(&pool, &word, "pten", &translations).await;
                     bot.send_message(msg.chat.id, translations)
@@ -66,11 +66,22 @@ async fn main() {
                 // Not cached, fetch
                 let body = fetch_translations::fetch(&word).await;
 
+                // TODO get dir from user settings
+                let raw_translations = fetch_translations::get_raw_translations(&body, "pten");
+
+                if raw_translations.is_empty() {
+                    bot.send_message(msg.chat.id, "No translations found.")
+                        .parse_mode(ParseMode::Html)
+                        .await?;
+                    return Ok(());
+                }
+
                 /*
                 Store the fetched HTML in the database
                 */
 
-                let translations = fetch_translations::parse_body(&body).await;
+                let translations = fetch_translations::get_translations(&raw_translations);
+
                 if translations.is_empty() {
                     bot.send_message(msg.chat.id, "No translations found.")
                         .parse_mode(ParseMode::Html)
@@ -78,7 +89,7 @@ async fn main() {
                     return Ok(());
                 }
 
-                let _ = db::insert_html(&pool, &word, "pten", &body).await;
+                let _ = db::insert_html(&pool, &word, "pten", &raw_translations).await;
                 let _ = db::update_formatted(&pool, &word, "pten", &translations).await;
 
                 bot.send_message(msg.chat.id, translations)

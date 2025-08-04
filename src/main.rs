@@ -1,6 +1,10 @@
 use dotenv::dotenv;
 use sqlx::SqlitePool;
-use teloxide::{prelude::*, types::ParseMode, update_listeners::webhooks};
+use teloxide::{
+    prelude::*,
+    types::{ChatKind, ParseMode},
+    update_listeners::webhooks,
+};
 mod db;
 mod fetch_translations;
 
@@ -36,6 +40,27 @@ async fn main() {
 
             async move {
                 let word = msg.text().unwrap_or("").trim().to_string().to_lowercase();
+                // If word is empty, do nothing
+                if word.is_empty() {
+                    return Ok(());
+                }
+
+                let bot_name = bot.get_me().await.unwrap().username.clone();
+                let bot_name_str = format!("@{}", bot_name.as_deref().unwrap_or(""));
+                // If it is a message in the group and the message is NOT addressed to the bot, do nothing
+                if matches!(msg.chat.kind, ChatKind::Public(_)) && !word.starts_with(&bot_name_str)
+                {
+                    return Ok(());
+                }
+
+                // If it is a message in the group and the message is addressed to the bot, remove the bot's name from the word
+                let word = if matches!(msg.chat.kind, ChatKind::Public(_))
+                    && word.starts_with(&bot_name_str)
+                {
+                    word.replacen(&bot_name_str, "", 1).trim().to_string()
+                } else {
+                    word
+                };
 
                 // Check if cached in DB
                 if let Some(cached) = db::get_cached_formatted(&pool, &word, "pten")
@@ -48,9 +73,7 @@ async fn main() {
                     return Ok(());
                 }
 
-                // TODO: declare enum for language direction
                 // TODO: Refactor this huge if statement
-
                 // check if cached raw HTML exists without formatted translation (for cases when it was removed when formatting has changed)
                 if let Some(cached_html) = db::get_cached_html(&pool, &word, "pten").await.unwrap()
                 {

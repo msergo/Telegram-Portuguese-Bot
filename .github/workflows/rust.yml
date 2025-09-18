@@ -21,6 +21,12 @@ jobs:
         env:
           OPENSSL_DIR: /usr
           PKG_CONFIG_ALLOW_SYSTEM_CFLAGS: 1
+      
+      - name: Run tests
+        run: cargo test
+        env:
+          OPENSSL_DIR: /usr
+          PKG_CONFIG_ALLOW_SYSTEM_CFLAGS: 1
 
       - name: Create tag from commit
         id: create_tag

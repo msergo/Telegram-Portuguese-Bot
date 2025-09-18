@@ -1,22 +1,16 @@
-use telegram_portuguese_bot::fetch_translations::{
-    get_translation_table_header, get_raw_translations, get_translations,
+use pt_dict_bot::fetch_translations::{
+    get_raw_translations, get_translation_table_header, get_translations,
 };
 
 #[test]
 fn test_get_translation_table_header() {
-    assert_eq!(
-        get_translation_table_header("pten"),
-        "Traduções principais"
-    );
+    assert_eq!(get_translation_table_header("pten"), "Traduções principais");
     assert_eq!(
         get_translation_table_header("iten"),
         "Principal Translations/Traduzioni principali"
     );
     // Default case
-    assert_eq!(
-        get_translation_table_header("xyz"),
-        "Traduções principais"
-    );
+    assert_eq!(get_translation_table_header("xyz"), "Traduções principais");
 }
 
 #[test]

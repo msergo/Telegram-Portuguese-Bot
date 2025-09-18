@@ -1,32 +1,59 @@
-name: Release on commit to master
+name: Run tests and release on commit to master
 
 on:
   push:
-    branches: [master]
+    branches:
+      - '**'
 
 jobs:
-  build-and-release:
+  build-and-test:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install Cross
-        run: cargo install cross 
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
 
-      - name: Build binary
+      - name: Cache Cargo build
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-build-
+
+      - name: Install Cross
+        run: cargo install cross
+
+      - name: Build binary (tests)
         run: cross build --release --target x86_64-unknown-linux-musl
         env:
           OPENSSL_DIR: /usr
           PKG_CONFIG_ALLOW_SYSTEM_CFLAGS: 1
-      
+
       - name: Run tests
         run: cargo test
         env:
           OPENSSL_DIR: /usr
           PKG_CONFIG_ALLOW_SYSTEM_CFLAGS: 1
+
+  release:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+
+    if: github.ref == 'refs/heads/master'
+
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Create tag from commit
         id: create_tag

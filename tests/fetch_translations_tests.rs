@@ -74,10 +74,10 @@ fn test_get_translations_basic() {
 fn test_get_translations_skips_bad_rows() {
     let table_html = r#"
         <table class="WRD">
-            <tr>
+            <tr class="odd">
                 <td>only one td</td>
             </tr>
-            <tr>
+            <tr class="even">
                 <td>one</td><td>two</td><td>three</td>
             </tr>
         </table>

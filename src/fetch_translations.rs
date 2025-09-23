@@ -51,7 +51,7 @@ pub fn get_translations(table_html: &str) -> String {
         let class = row.value().attr("class").unwrap_or("");
         if !class.contains("even") && !class.contains("odd") {
             continue;
-        }
+        }   
 
         // TODO: improve formatting
         translations.push_str(&format!(

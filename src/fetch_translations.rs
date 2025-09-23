@@ -47,6 +47,12 @@ pub fn get_translations(table_html: &str) -> String {
             continue; // skip rows that don't have exactly three columns
         }
 
+        // Skip rows that does not have either "even" or "odd" class (eg header rows)
+        let class = row.value().attr("class").unwrap_or("");
+        if !class.contains("even") && !class.contains("odd") {
+            continue;
+        }
+
         // TODO: improve formatting
         translations.push_str(&format!(
             "<b>{}</b> {} ⮕ {}\n",

@@ -50,7 +50,12 @@ fn test_get_raw_translations_not_found() {
 fn test_get_translations_basic() {
     let table_html = r#"
         <table class="WRD">
-            <tr>
+            <tr class>
+                <td><strong>Português</strong></td>
+                <td>nf</td>
+                <td><strong>Inglês</strong></td>
+            </tr>
+            <tr class="odd">
                 <td><strong>casa</strong></td>
                 <td>nf</td>
                 <td>house</td>

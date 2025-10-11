@@ -5,15 +5,21 @@ edition = "2024"
 
 [dependencies]
 reqwest = { version = "0.12", features = ["rustls-tls"] }
-scraper = "0.23.1"
+scraper = "0.24.0"
 tokio = { version = "1", features = ["full"] }
 teloxide = { version = "0.17.0", features = ["macros", "webhooks-axum"] }
 log = "0.4"
 pretty_env_logger = "0.5"
 dotenv = "0.15"
-sqlx = { version = "0.8.6", features = ["sqlite", "runtime-tokio-rustls"] }
 openssl = { version = "0.10", features = ["vendored"] }
-sea-orm = { version = "1.0", features = ["sqlx-sqlite", "runtime-tokio-rustls", "macros"] }
-sea-orm-migration = { version = "1.0", features = ["sqlx-sqlite", "runtime-tokio-rustls"] }
+sea-orm = { version = "1.0", features = [
+    "sqlx-sqlite",
+    "runtime-tokio-rustls",
+    "macros",
+] }
+sea-orm-migration = { version = "1.0", features = [
+    "sqlx-sqlite",
+    "runtime-tokio-rustls",
+] }
 chrono = "0.4"
 serde = { version = "1.0", features = ["derive"] }

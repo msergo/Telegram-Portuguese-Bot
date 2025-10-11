@@ -58,7 +58,11 @@ async fn main() {
 
             async move {
                 // Log chat ID and message ID for debugging
-                log::info!("Received message in chat {}", msg.chat.id);
+                log::info!(
+                    "Received message in chat {} from user {}",
+                    msg.chat.id,
+                    msg.chat.username().unwrap_or("unknown")
+                );
                 let word = msg.text().unwrap_or("").trim().to_string().to_lowercase();
                 // If word is empty, do nothing
                 if word.is_empty() {

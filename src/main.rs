@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
 use dotenv::dotenv;
+use sea_orm::Database;
+use sea_orm_migration::MigratorTrait;
 use sqlx::SqlitePool;
 use teloxide::{
     prelude::*,
@@ -9,6 +11,8 @@ use teloxide::{
 };
 mod db;
 mod fetch_translations;
+use pt_dict_bot::migration::Migrator;
+use pt_dict_bot::user_repository::UserRepository;
 
 #[tokio::main]
 async fn main() {
@@ -16,7 +20,7 @@ async fn main() {
     pretty_env_logger::init();
     log::info!("Starting Portuguese dict bot...");
 
-    // Initialize the database
+    // Initialize the database (sqlx pool)
     db::ensure_sqlite_file("./cache/translations.db").expect("Failed to ensure SQLite file exists");
     let pool = SqlitePool::connect("sqlite://cache/translations.db")
         .await
@@ -24,6 +28,18 @@ async fn main() {
     db::init_db(&pool)
         .await
         .expect("Failed to initialize database");
+
+    // Use a separate SeaORM connection for user configs (we keep two connectors for now)
+    let sea_orm_db = sea_orm::Database::connect("sqlite://cache/translations.db")
+        .await
+        .expect("Failed to connect to database with SeaORM");
+
+    // Run migrations
+    Migrator::up(&sea_orm_db, None)
+        .await
+        .expect("Failed to run migrations");
+
+    let user_repo = UserRepository::new(sea_orm_db);
 
     let bot = Bot::from_env();
 
@@ -39,6 +55,7 @@ async fn main() {
         bot,
         move |bot: Bot, msg: Message| {
             let pool = pool.clone(); // clone the pool for this handler
+            let user_repo = user_repo.clone(); // clone the user repository
 
             async move {
                 // Log chat ID and message ID for debugging
@@ -66,14 +83,13 @@ async fn main() {
                     word
                 };
 
-                // Quick and dirty solution: get trnslation direction from env CHAT_TRANSLATION_DIRECTION_{CHAT_ID}, fallback to "pten" if not set
-                // TODO get dir from user settings
+                // Get translation direction from database with "pten" default fallback
+                // Note: chat_id represents chat context (group ID for groups, user ID for private chats)
                 let chat_id = Arc::new(msg.chat.id.to_string().replace("-", ""));
-                let chat_translation_direction_key = format!("DIRECTION_{}", chat_id);
-
-                // Get the direction from env, or default to "pten"
-                let chat_translation_direction = dotenv::var(&chat_translation_direction_key)
-                    .unwrap_or_else(|_| "pten".to_string());
+                let chat_translation_direction = match user_repo.get_user(&chat_id).await {
+                    Ok(Some(user)) => user.translation_direction,
+                    _ => "pten".to_string(), // Default fallback
+                };
 
                 // Check if cached in DB
                 if let Some(cached) =

@@ -1,14 +1,15 @@
 use std::sync::Arc;
 
 use dotenv::dotenv;
-use sqlx::SqlitePool;
+use sea_orm_migration::MigratorTrait;
 use teloxide::{
     prelude::*,
     types::{ChatKind, ParseMode},
     update_listeners::webhooks,
 };
-mod db;
 mod fetch_translations;
+use pt_dict_bot::migration::Migrator;
+use pt_dict_bot::user_repository::UserRepository;
 
 #[tokio::main]
 async fn main() {
@@ -16,14 +17,28 @@ async fn main() {
     pretty_env_logger::init();
     log::info!("Starting Portuguese dict bot...");
 
-    // Initialize the database
-    db::ensure_sqlite_file("./cache/translations.db").expect("Failed to ensure SQLite file exists");
-    let pool = SqlitePool::connect("sqlite://cache/translations.db")
+    // Ensure parent directory for the database file exists.
+    {
+        use std::fs;
+        use std::path::Path;
+        let db_path = Path::new("./cache/translations.db");
+        if let Some(parent) = db_path.parent() {
+            fs::create_dir_all(parent).expect("Failed to create cache directory");
+        }
+    }
+
+    // Connect SeaORM (user configs & cache migrations)
+    let sea_orm_db = sea_orm::Database::connect("sqlite://cache/translations.db")
         .await
-        .expect("Failed to open database");
-    db::init_db(&pool)
+        .expect("Failed to connect to database with SeaORM");
+
+    // Run migrations
+    Migrator::up(&sea_orm_db, None)
         .await
-        .expect("Failed to initialize database");
+        .expect("Failed to run migrations");
+
+    let user_repo = UserRepository::new(sea_orm_db);
+    let cache_repo = pt_dict_bot::cache_repository::CacheRepository::new(user_repo.db.clone());
 
     let bot = Bot::from_env();
 
@@ -38,11 +53,16 @@ async fn main() {
     teloxide::repl_with_listener(
         bot,
         move |bot: Bot, msg: Message| {
-            let pool = pool.clone(); // clone the pool for this handler
+            let user_repo = user_repo.clone(); // clone the user repository
+            let cache_repo = cache_repo.clone(); // clone the cache repository
 
             async move {
                 // Log chat ID and message ID for debugging
-                log::info!("Received message in chat {}", msg.chat.id);
+                log::info!(
+                    "Received message in chat {} from user {}",
+                    msg.chat.id,
+                    msg.chat.username().unwrap_or("unknown")
+                );
                 let word = msg.text().unwrap_or("").trim().to_string().to_lowercase();
                 // If word is empty, do nothing
                 if word.is_empty() {
@@ -66,20 +86,19 @@ async fn main() {
                     word
                 };
 
-                // Quick and dirty solution: get trnslation direction from env CHAT_TRANSLATION_DIRECTION_{CHAT_ID}, fallback to "pten" if not set
-                // TODO get dir from user settings
-                let chat_id = Arc::new(msg.chat.id.to_string().replace("-", ""));
-                let chat_translation_direction_key = format!("DIRECTION_{}", chat_id);
-
-                // Get the direction from env, or default to "pten"
-                let chat_translation_direction = dotenv::var(&chat_translation_direction_key)
-                    .unwrap_or_else(|_| "pten".to_string());
+                // Get translation direction from database with "pten" default fallback
+                // Note: chat_id represents chat context (group ID for groups, user ID for private chats)
+                let chat_id = Arc::new(msg.chat.id.to_string());
+                let chat_translation_direction = match user_repo.get_user(&chat_id).await {
+                    Ok(Some(user)) => user.translation_direction,
+                    _ => "pten".to_string(), // Default fallback
+                };
 
                 // Check if cached in DB
-                if let Some(cached) =
-                    db::get_cached_formatted(&pool, &word, &chat_translation_direction)
-                        .await
-                        .unwrap()
+                if let Some(cached) = cache_repo
+                    .get_cached_formatted(&word, &chat_translation_direction)
+                    .await
+                    .unwrap()
                 {
                     bot.send_message(msg.chat.id, cached)
                         .parse_mode(ParseMode::Html)
@@ -87,22 +106,17 @@ async fn main() {
                     return Ok(());
                 }
 
-                // TODO: Refactor this huge if statement
-                // check if cached raw HTML exists without formatted translation (for cases when it was removed when formatting has changed)
-                if let Some(cached_html) =
-                    db::get_cached_html(&pool, &word, &chat_translation_direction)
-                        .await
-                        .unwrap()
+                // check if cached raw HTML exists without formatted translation
+                if let Some(cached_html) = cache_repo
+                    .get_cached_html(&word, &chat_translation_direction)
+                    .await
+                    .unwrap()
                 {
                     let translations = fetch_translations::get_translations(&cached_html);
                     // Store the formatted translation in the database
-                    let _ = db::update_formatted(
-                        &pool,
-                        &word,
-                        &chat_translation_direction,
-                        &translations,
-                    )
-                    .await;
+                    let _ = cache_repo
+                        .update_formatted(&word, &chat_translation_direction, &translations)
+                        .await;
                     bot.send_message(msg.chat.id, translations)
                         .parse_mode(ParseMode::Html)
                         .await?;
@@ -122,9 +136,7 @@ async fn main() {
                     return Ok(());
                 }
 
-                /*
-                Store the fetched HTML in the database
-                */
+                // Store fetched HTML and formatted translation
 
                 let translations = fetch_translations::get_translations(&raw_translations);
 
@@ -135,13 +147,13 @@ async fn main() {
                     return Ok(());
                 }
 
-                // TODO: store in one go
-                let _ =
-                    db::insert_html(&pool, &word, &chat_translation_direction, &raw_translations)
-                        .await;
-                let _ =
-                    db::update_formatted(&pool, &word, &chat_translation_direction, &translations)
-                        .await;
+                // store in DB
+                let _ = cache_repo
+                    .insert_html(&word, &chat_translation_direction, &raw_translations)
+                    .await;
+                let _ = cache_repo
+                    .update_formatted(&word, &chat_translation_direction, &translations)
+                    .await;
 
                 bot.send_message(msg.chat.id, translations)
                     .parse_mode(ParseMode::Html)

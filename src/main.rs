@@ -1,8 +1,11 @@
 use std::sync::Arc;
 
 use dotenv::dotenv;
-use pt_dict_bot::constants::DEFAULT_LANG_DIRECTION;
+use pt_dict_bot::constants::{
+    DEFAULT_LANG_DIRECTION, LANG_EN_IT, LANG_EN_PT, LANG_IT_EN, LANG_PT_EN,
+};
 use pt_dict_bot::fetch_translations;
+use pt_dict_bot::flip_direction;
 use pt_dict_bot::migration::Migrator;
 use pt_dict_bot::user_repository::UserRepository;
 use sea_orm_migration::MigratorTrait;
@@ -10,7 +13,15 @@ use teloxide::{
     prelude::*,
     types::{ChatKind, ParseMode},
     update_listeners::webhooks,
+    utils::command::BotCommands,
 };
+
+#[derive(BotCommands, Clone)]
+#[command(rename_rule = "lowercase", description = "Supported commands:")]
+enum Command {
+    #[command(description = "Toggle translation direction")]
+    Flip,
+}
 
 #[tokio::main]
 async fn main() {
@@ -90,6 +101,25 @@ async fn main() {
                 // Get translation direction from database with DEFAULT_LANG_DIRECTION fallback
                 // Note: chat_id represents chat context (group ID for groups, user ID for private chats)
                 let chat_id = Arc::new(msg.chat.id.to_string());
+
+                if let Ok(cmd) = Command::parse(&word, bot_name.as_deref().unwrap_or("")) {
+                    match cmd {
+                        Command::Flip => {
+                            if let Err(e) = handle_flip_command(
+                                bot.clone(),
+                                msg.clone(),
+                                user_repo.clone(),
+                                chat_id.clone(),
+                            )
+                            .await
+                            {
+                                log::error!("Error in flip command handler: {}", e);
+                            }
+                            return Ok(());
+                        }
+                    }
+                }
+
                 let chat_translation_direction = match user_repo.get_user(&chat_id).await {
                     Ok(Some(user)) => user.translation_direction,
                     _ => DEFAULT_LANG_DIRECTION.to_string(), // Default fallback
@@ -166,4 +196,70 @@ async fn main() {
         listener,
     )
     .await;
+}
+
+/// Handles the /flip command by toggling user's translation direction.
+/// Logs errors and falls back to default silently.
+async fn handle_flip_command(
+    bot: Bot,
+    msg: Message,
+    user_repo: UserRepository,
+    chat_id: Arc<String>,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let (current_direction, user_exists) = match user_repo.get_user(&chat_id).await {
+        Ok(Some(user)) => (user.translation_direction, true),
+        Ok(None) => (DEFAULT_LANG_DIRECTION.to_string(), false),
+        Err(e) => {
+            log::error!("Database error getting user for flip command: {}", e);
+            (DEFAULT_LANG_DIRECTION.to_string(), false)
+        }
+    };
+
+    let new_direction = match flip_direction(&current_direction) {
+        Some(dir) => dir,
+        None => {
+            log::warn!(
+                "Cannot flip invalid direction '{}' for chat {}. Using flipped default.",
+                current_direction,
+                chat_id
+            );
+            flip_direction(DEFAULT_LANG_DIRECTION)
+                .unwrap_or_else(|| DEFAULT_LANG_DIRECTION.to_string())
+        }
+    };
+
+    let update_result = if user_exists {
+        user_repo
+            .update_translation_direction(&chat_id, &new_direction)
+            .await
+    } else {
+        let user_id = msg.from.as_ref().map(|u| u.id.0 as i64);
+        let username = msg.from.as_ref().and_then(|u| u.username.clone());
+        user_repo
+            .create_or_update_user(&chat_id, &new_direction, user_id, username.as_deref())
+            .await
+    };
+
+    match update_result {
+        Ok(_) => {
+            let direction_name = match new_direction.as_str() {
+                LANG_PT_EN => "Portuguese → English",
+                LANG_EN_PT => "English → Portuguese",
+                LANG_IT_EN => "Italian → English",
+                LANG_EN_IT => "English → Italian",
+                _ => &new_direction,
+            };
+
+            bot.send_message(
+                msg.chat.id,
+                format!("✅ Translation direction changed to: {}", direction_name),
+            )
+            .await?;
+        }
+        Err(e) => {
+            log::error!("Failed to update direction for chat {}: {}", chat_id, e);
+        }
+    }
+
+    Ok(())
 }

@@ -1,10 +1,14 @@
 use reqwest::Client;
 use scraper::{ElementRef, Html, Node, Selector};
 
+use crate::constants::{LANG_EN_IT, LANG_EN_PT, LANG_IT_EN, LANG_PT_EN};
+
 pub fn get_translation_table_header(lang_direction: &str) -> &'static str {
     match lang_direction {
-        "pten" => "Traduções principais",
-        "iten" => "Principal Translations/Traduzioni principali",
+        s if s == LANG_PT_EN => "Traduções principais",
+        s if s == LANG_EN_PT => "Traduções principais",
+        s if s == LANG_IT_EN => "Principal Translations/Traduzioni principali",
+        s if s == LANG_EN_IT => "Principal Translations/Traduzioni principali",
         _ => "Traduções principais", // default case
     }
 }
@@ -51,7 +55,7 @@ pub fn get_translations(table_html: &str) -> String {
         let class = row.value().attr("class").unwrap_or("");
         if !class.contains("even") && !class.contains("odd") {
             continue;
-        }   
+        }
 
         // TODO: improve formatting
         translations.push_str(&format!(

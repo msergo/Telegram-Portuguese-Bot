@@ -1,3 +1,4 @@
+use pt_dict_bot::constants::{DEFAULT_LANG_DIRECTION, LANG_IT_EN};
 use pt_dict_bot::migration::Migrator;
 use pt_dict_bot::user_repository::UserRepository;
 use sea_orm::Database;
@@ -19,12 +20,12 @@ async fn test_user_config_integration() {
     // Test default fallback
     let default_direction = match repo.get_user("unknown_chat").await {
         Ok(Some(user)) => user.translation_direction,
-        _ => "pten".to_string(),
+        _ => DEFAULT_LANG_DIRECTION.to_string(),
     };
-    assert_eq!(default_direction, "pten");
+    assert_eq!(default_direction, DEFAULT_LANG_DIRECTION);
 
     // Test stored user config
-    repo.create_or_update_user("test_chat", "iten", None, None)
+    repo.create_or_update_user("test_chat", LANG_IT_EN, None, None)
         .await
         .expect("Failed to create user");
 
@@ -35,7 +36,7 @@ async fn test_user_config_integration() {
         .expect("User should exist")
         .translation_direction;
 
-    assert_eq!(stored_direction, "iten");
+    assert_eq!(stored_direction, LANG_IT_EN);
 }
 
 #[tokio::test]
@@ -52,7 +53,7 @@ async fn test_chat_context_behavior() {
     let repo = UserRepository::new(db);
 
     // Simulate group chat scenario: group ID "group_123" has "iten" setting
-    repo.create_or_update_user("group_123", "iten", None, None)
+    repo.create_or_update_user("group_123", LANG_IT_EN, None, None)
         .await
         .expect("Failed to create group config");
 
@@ -64,7 +65,7 @@ async fn test_chat_context_behavior() {
         .expect("Group config should exist")
         .translation_direction;
 
-    assert_eq!(group_direction, "iten");
+    assert_eq!(group_direction, LANG_IT_EN);
 
     // Individual users in the group don't have separate settings
     let individual_user_result = repo

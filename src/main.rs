@@ -1,15 +1,16 @@
 use std::sync::Arc;
 
 use dotenv::dotenv;
+use pt_dict_bot::constants::DEFAULT_LANG_DIRECTION;
+use pt_dict_bot::fetch_translations;
+use pt_dict_bot::migration::Migrator;
+use pt_dict_bot::user_repository::UserRepository;
 use sea_orm_migration::MigratorTrait;
 use teloxide::{
     prelude::*,
     types::{ChatKind, ParseMode},
     update_listeners::webhooks,
 };
-mod fetch_translations;
-use pt_dict_bot::migration::Migrator;
-use pt_dict_bot::user_repository::UserRepository;
 
 #[tokio::main]
 async fn main() {
@@ -86,12 +87,12 @@ async fn main() {
                     word
                 };
 
-                // Get translation direction from database with "pten" default fallback
+                // Get translation direction from database with DEFAULT_LANG_DIRECTION fallback
                 // Note: chat_id represents chat context (group ID for groups, user ID for private chats)
                 let chat_id = Arc::new(msg.chat.id.to_string());
                 let chat_translation_direction = match user_repo.get_user(&chat_id).await {
                     Ok(Some(user)) => user.translation_direction,
-                    _ => "pten".to_string(), // Default fallback
+                    _ => DEFAULT_LANG_DIRECTION.to_string(), // Default fallback
                 };
 
                 // Check if cached in DB

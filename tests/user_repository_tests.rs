@@ -1,3 +1,4 @@
+use pt_dict_bot::constants::LANG_PT_EN;
 use pt_dict_bot::migration::Migrator;
 use pt_dict_bot::user_repository::UserRepository;
 use sea_orm::{Database, DatabaseConnection};
@@ -24,12 +25,12 @@ async fn test_create_and_get_user() {
 
     // Create user
     let user = repo
-        .create_or_update_user("123", "pten", Some(456789), Some("johndoe"))
+        .create_or_update_user("123", LANG_PT_EN, Some(456789), Some("johndoe"))
         .await
         .expect("Failed to create user");
 
     assert_eq!(user.chat_id, "123");
-    assert_eq!(user.translation_direction, "pten");
+    assert_eq!(user.translation_direction, LANG_PT_EN);
     assert_eq!(user.user_id, Some(456789));
     assert_eq!(user.username, Some("johndoe".to_string()));
 
@@ -41,7 +42,7 @@ async fn test_create_and_get_user() {
         .expect("User should exist");
 
     assert_eq!(retrieved.chat_id, "123");
-    assert_eq!(retrieved.translation_direction, "pten");
+    assert_eq!(retrieved.translation_direction, LANG_PT_EN);
 }
 
 #[tokio::test]

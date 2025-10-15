@@ -1,12 +1,13 @@
+use pt_dict_bot::constants::{LANG_IT_EN, LANG_PT_EN};
 use pt_dict_bot::fetch_translations::{
     get_raw_translations, get_translation_table_header, get_translations,
 };
 
 #[test]
 fn test_get_translation_table_header() {
-    assert_eq!(get_translation_table_header("pten"), "Traduções principais");
+    assert_eq!(get_translation_table_header(LANG_PT_EN), "Traduções principais");
     assert_eq!(
-        get_translation_table_header("iten"),
+        get_translation_table_header(LANG_IT_EN),
         "Principal Translations/Traduzioni principali"
     );
     // Default case
@@ -26,7 +27,7 @@ fn test_get_raw_translations_found() {
             </body>
         </html>
     "#;
-    let result = get_raw_translations(body, "pten");
+    let result = get_raw_translations(body, LANG_PT_EN);
     assert!(result.contains("<table")); // Should return some table HTML
     assert!(result.contains("Traduções principais"));
 }
@@ -42,7 +43,7 @@ fn test_get_raw_translations_not_found() {
             </body>
         </html>
     "#;
-    let result = get_raw_translations(body, "pten");
+    let result = get_raw_translations(body, LANG_PT_EN);
     assert_eq!(result, "");
 }
 

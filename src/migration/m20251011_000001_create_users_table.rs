@@ -1,3 +1,4 @@
+use crate::constants::DEFAULT_LANG_DIRECTION;
 use sea_orm_migration::{prelude::*, schema::*};
 
 #[derive(DeriveMigrationName)]
@@ -12,7 +13,7 @@ impl MigrationTrait for Migration {
                     .table(Users::Table)
                     .if_not_exists()
                     .col(string(Users::ChatId).primary_key())
-                    .col(string(Users::TranslationDirection).default("pten"))
+                    .col(string(Users::TranslationDirection).default(DEFAULT_LANG_DIRECTION))
                     .col(big_integer_null(Users::UserId))
                     .col(string_null(Users::Username))
                     .col(timestamp(Users::CreatedAt).default(Expr::current_timestamp()))
